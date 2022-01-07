@@ -1,0 +1,181 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "String"
+        },
+        "applicationGatewayName": {
+            "type": "String"
+        },
+        "tier": {
+            "type": "String"
+        },
+        "skuSize": {
+            "type": "String"
+        },
+        "capacity": {
+            "defaultValue": 2,
+            "type": "Int"
+        },
+        "subnetName": {
+            "type": "String"
+        },
+        "zones": {
+            "type": "Array"
+        },
+        "managedIdentity": {
+            "type": "String"
+        },
+        "confluencelistenervaultCert": {
+            "type": "SecureString"
+        },
+        "autoScaleMaxCapacity": {
+            "type": "Int"
+        }
+    },
+    "variables": {
+        "vnetId": "/subscriptions/6d9b8289-f926-4e78-bd0b-9a0b170a9fb3/resourceGroups/rg-prd-tls-network-dr/providers/Microsoft.Network/virtualNetworks/vnet-prd-tls-neu",
+        "publicIPRef": "/subscriptions/6d9b8289-f926-4e78-bd0b-9a0b170a9fb3/resourceGroups/rg-prd-tls-network-dr/providers/Microsoft.Network/publicIPAddresses/pip-prd-tls-agw-01-dr",
+        "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]",
+        "applicationGatewayId": "[resourceId('Microsoft.Network/applicationGateways', parameters('applicationGatewayName'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/applicationGateways",
+            "apiVersion": "2019-09-01",
+            "name": "[parameters('applicationGatewayName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [],
+            "tags": {
+                "businessCriticality": "high",
+                "costCenter": "ITaaS",
+                "environment": "prd-dr",
+                "project": "CMaaS-TLS-DR",
+                "resourceOwner": "sic-itaas-supportdesk@telindus.nl"
+            },
+            "zones": "[parameters('zones')]",
+            "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                    "[parameters('managedIdentity')]": {}
+                }
+            },
+            "properties": {
+                "sku": {
+                    "name": "[parameters('skuSize')]",
+                    "tier": "[parameters('tier')]"
+                },
+                "gatewayIPConfigurations": [
+                    {
+                        "name": "appGatewayIpConfig",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            }
+                        }
+                    }
+                ],
+                "frontendIPConfigurations": [
+                    {
+                        "name": "appGwPublicFrontendIp",
+                        "properties": {
+                            "PublicIPAddress": {
+                                "id": "[variables('publicIPRef')]"
+                            }
+                        }
+                    }
+                ],
+                "frontendPorts": [
+                    {
+                        "name": "port_443",
+                        "properties": {
+                            "Port": 443
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "bep-prd-tls-confjira01-dr",
+                        "properties": {
+                            "backendAddresses": []
+                        }
+                    }
+                ],
+                "backendHttpSettingsCollection": [
+                    {
+                        "name": "confluence_settings",
+                        "properties": {
+                            "Port": 8090,
+                            "Protocol": "Http",
+                            "cookieBasedAffinity": "Enabled",
+                            "requestTimeout": 60,
+                            "affinityCookieName": "ApplicationGatewayAffinity",
+                            "connectionDraining": {
+                                "drainTimeoutInSec": 60,
+                                "enabled": true
+                            }
+                        }
+                    }
+                ],
+                "httpListeners": [
+                    {
+                        "name": "confluencelistener",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(variables('applicationGatewayId'), '/frontendIPConfigurations/appGwPublicFrontendIp')]"
+                            },
+                            "frontendPort": {
+                                "id": "[concat(variables('applicationGatewayId'), '/frontendPorts/port_443')]"
+                            },
+                            "protocol": "Https",
+                            "sslCertificate": {
+                                "id": "[concat(variables('applicationGatewayId'), '/sslCertificates/telindus')]"
+                            },
+                            "hostName": "confluencetest.telindus.nl",
+                            "requireServerNameIndication": true
+                        }
+                    }
+                ],
+                "requestRoutingRules": [
+                    {
+                        "Name": "confluencerule",
+                        "properties": {
+                            "RuleType": "Basic",
+                            "httpListener": {
+                                "id": "[concat(variables('applicationGatewayId'), '/httpListeners/confluencelistener')]"
+                            },
+                            "priority": null,
+                            "backendAddressPool": {
+                                "id": "[concat(variables('applicationGatewayId'), '/backendAddressPools/bep-prd-tls-confjira01-dr')]"
+                            },
+                            "backendHttpSettings": {
+                                "id": "[concat(variables('applicationGatewayId'), '/backendHttpSettingsCollection/confluence_settings')]"
+                            }
+                        }
+                    }
+                ],
+                "enableHttp2": false,
+                "sslCertificates": [
+                    {
+                        "name": "telindus",
+                        "properties": {
+                            "keyVaultSecretId": "[parameters('confluencelistenervaultCert')]"
+                        }
+                    }
+                ],
+                "probes": [],
+                "autoscaleConfiguration": {
+                    "minCapacity": "[parameters('capacity')]",
+                    "maxCapacity": "[parameters('autoScaleMaxCapacity')]"
+                },
+                "webApplicationFirewallConfiguration": {
+                    "enabled": true,
+                    "firewallMode": "Detection",
+                    "ruleSetType": "OWASP",
+                    "ruleSetVersion": "3.0"
+                }
+            }
+        }
+    ]
+}

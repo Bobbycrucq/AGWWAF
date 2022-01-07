@@ -1,0 +1,36 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "value": "northeurope"
+        },
+        "applicationGatewayName": {
+            "value": "agw-prd-tls-confjira01-dr"
+        },
+        "tier": {
+            "value": "WAF_v2"
+        },
+        "skuSize": {
+            "value": "WAF_v2"
+        },
+        "capacity": {
+            "value": 2
+        },
+        "subnetName": {
+            "value": "snet-prd-tls-agw-dr"
+        },
+        "zones": {
+            "value": []
+        },
+        "managedIdentity": {
+            "value": "/subscriptions/6d9b8289-f926-4e78-bd0b-9a0b170a9fb3/resourceGroups/rg-prd-tls-shared/providers/Microsoft.ManagedIdentity/userAssignedIdentities/telindusroot"
+        },
+        "confluencelistenervaultCert": {
+            "value": null
+        },
+        "autoScaleMaxCapacity": {
+            "value": 10
+        }
+    }
+}
